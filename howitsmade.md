@@ -39,7 +39,8 @@
 ## Making views
 
 - The user-interface was made with ejs
-- Used font-awesome CDN and 'Stale' theme from bootswatch.com
+- Used font-awesome CDN for icons
+- Used 'Stale' theme from bootswatch.com 
 
 ### welcome.ejs
 
