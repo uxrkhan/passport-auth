@@ -1,5 +1,7 @@
 # How this project was made...
 
+Since this repo is made for learning purposes, this README file shows how this project was made as it can be used as a reference or boilerplate code for adding authentication feature to any project website such as a blog or anything that deals with user accounts.
+ 
 ## Initializing and installing dependencies
 
 ```
@@ -65,7 +67,7 @@ This is the main html file which contains all the body of the root container
 
 - The welcome.ejs view is the basically the root login page that allows the user to either register or log in
 
-### login and register views
+### Login and register views
 
 - The login and register view are made with bootstrap form and form-control classes.
 - In order to stop the details entered from getting cleared when form is not validated, the form `<input>` tag must have the value:
@@ -74,7 +76,8 @@ This is the main html file which contains all the body of the root container
         ...
         value="<%= typeof email != 'undefined' ? email : '' %>">          
     ```
-- The register form should include error messages when the user does not enter valid data. In order to do that an ejs script was used to warn the user.
+### The messages.ejs partial
+- The register and login forms should include error messages when the user does not enter valid data. In order to do that an ejs script was written in `views/partials/messages.ejs` that was used to warn the user.
     ```html
     <% if (typeof errors != 'undefined') errors.forEach(function(err){ %>
         <%= err.msg %>
@@ -91,6 +94,14 @@ This is the main html file which contains all the body of the root container
         </div>
     <% }) %>
     ```
+- This messages.ejs was included in both login.ejs and register.ejs using 
+    ```html
+    <%- include('./partials/messages.ejs') %>
+    ````
+
+### Dashboard view
+
+- The dashboard is the view that should appear after the user successfully logs in. This page can contain anything. A logout button is necessary.
 
 ## Mongoose for Database
 For databases, the obvious choice was MongoDB. 
@@ -118,9 +129,9 @@ client.connect(err => {
 - This code was copied to `./config/keys.js`
     ```js
     module.exports = {
-        MongoURI: "mongodb+srv://uzair:<password>@testcluster1-rw0zw.mongodb.net/test?retryWrites=true&w=majority"
+        MongoURI: "mongodb+srv://<username>:<password>@testcluster1-rw0zw.mongodb.net/test?retryWrites=true&w=majority"
     }
-    // replace the <password> with the database password.
+    // replace the <username> and <password> with the database login details.
     ```
 ### Creating User model
 
@@ -215,7 +226,7 @@ app.use((res, req, next) => {
 })
 ```
 
-In order to display the success message, the following code was added to register.ejs and login.ejs
+In order to display the success or error message, the following code was added to partials/messages.ejs
 ```html
     <% if(success_msg != '') { %>
         <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -234,4 +245,188 @@ In order to display the success message, the following code was added to registe
             </button>
         </div>
     <% } %>
+```
+
+<hr>
+Ok so at this point the register feature is complete. Now to finish the login authentication feature...
+
+## Login authentication using Passport.js
+
+- Create a passport.js file in the config folder.
+- In the passport.js file, a local strategy of the passport-local was used, bcrypt was used for comparing password hashes and the User model was imported. 
+    ```js
+    const LocalStrategy = require('passport-local').Strategy;
+    const bcrypt = require('bcryptjs');
+
+    const User = require('../models/User');
+    ```
+- A function for configuring the local strategy to the passport instance was created and exported
+    ```js
+    // in passport.js
+    const passportConfig = (passport) => {
+        passport.use(new LocalStrategy({usernameField: 'email'}, (email, password, done) => {
+                
+            // Search for the user
+            User.findOne({email: email})
+                .then(user => {
+                    if (!user) {
+                        return done(null, false, { message: 'This email is not registered. Please Sign Up.' });
+                        // syntax: done(error, user, messageObject)
+                    } 
+
+                    // if user found, compare hashes
+                    bcrypt.compare(password, user.password, (err, isMatch) => {
+                        if (err) throw err;
+                        if (isMatch) {
+                            return done(null, user);
+                        } else {
+                            return done(null, false, { message: 'Incorrect password.' });
+                        }
+                    });
+                })
+                .catch(err => console.log(err));
+        }));
+    }
+
+    module.exports = passportConfig;
+    ```
+- In the app.js, the passport module was imported and its instance was configured with passport config created above
+    ```js
+    // in app.js
+    const passport = require('passport');
+
+    // configure passport
+    const configurePassport = require('./config/passport');
+    configurePassport(passport);
+
+    ... 
+
+    // use passport middleware
+    app.use(passport.initialize());
+    app.use(passport.session());
+    ```
+- In order to display the error messages on failed login attempts, we have to create a error alert in the messages.ejs partial:
+    ```html
+    <% if(error != '') { %>
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <%= error %>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    <% } %>
+    ```
+    And we can add a global variable for the error by editing the custom middleware in app.js
+    ```js
+    // in app.js
+
+    // Using global vars (custom middleware) 
+    app.use((req, res, next) => {
+        ...
+        ...
+        res.locals.error = req.flash('error');
+        next();
+    })
+    ```
+
+### Handling the login POST method
+
+- The post method on login, i.e. when the user enters login details and submits it is handled in the users.js file
+    ```js
+    // in users.js
+    router.post('/login', (req, res, next) => {
+        passport.authenticate('local', {
+            successRedirect: '/dashboard',
+            failureRedirect: '/users/login',
+            badRequestMessage: 'Missing credentials',
+            failureFlash: true
+        })(req, res, next);
+    });
+    ```
+### Handling Logout
+
+- The logout GET request simply redirects the user back to /users/login and displays a flash message 
+    ```js
+    // in users.js
+
+    // Handle logout
+    router.get('/logout', (req, res, next) => {
+        req.logout();
+        req.flash('success_msg', 'You are now logged out.');
+        res.redirect('/dashboard');
+    });
+    ```
+
+## Ensuring authenticated session
+
+At this point the login feature is not yet complete. Although a successful login redirects the user to the dashboard, the user can logout and still access the dashboard just by entering its path in the browser without having to authenticate.
+
+This problem can be solved by making a config file to ensure authentication
+
+- Make a file called auth.js in config folder
+- This file will export a function called ensureAuthenticated that will use the passport.session() middleware called .isAuthenticated() to check if the session is authenticated
+    ```js
+    // in auth.js
+    module.exports = {
+        ensureAuthenticated: function(req, res, next) {
+            if (req.isAuthenticated()) {
+                return next();
+            }
+            req.flash('error_msg', 'You must be logged in to view this resource.');
+            res.redirect('/users/login');
+        } 
+    }
+    ```
+- In index.js we have to import the above function and edit the dashboard get method as follows
+    ```js
+    // in index.js
+    const { ensureAuthenticated } = require('../config/auth');
+    
+    ...
+        
+    router.get('/dashboard', ensureAuthentication, (req, res) => {
+        res.render('dashboard');
+    })
+    ```
+- The user's name (or any detail) must be visible in the dashboard. So to pass the user's detail do this:
+    ```js
+    router.get('/dashboard', ensureAuthentication, (req, res) => {
+        res.render('dashboard', {user: req.user});
+    })
+    ```
+- Then edit the dashboard.ejs file to display the user's name:
+    ```html
+    <div class="card m-5">
+        <h1 class="card-header">Welcome, <!-- User --> <%= user.name %></h2>
+        ...
+    </div>
+    ```
+## Final Directory Structure
+
+Finally the project directory will look something like this
+
+```
+.
+├── config/
+|   ├── keys.js
+|   ├── auth.js
+|   └── passport.js
+├── routes/
+|   ├── index.js
+|   └── users.js
+├── views/
+|   ├── partials/
+|   |   └── messages.ejs
+|   ├── dashboard.ejs
+|   ├── welcome.ejs
+|   ├── layout.ejs
+|   ├── login.ejs
+|   └── register.ejs
+├── models/
+|   └── User.js
+├── node_modules/
+├── app.js
+├── package.json
+└── package-lock.json
+
 ```
