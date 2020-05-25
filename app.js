@@ -1,24 +1,23 @@
 const express = require('express');
-const expressLayouts = require('express-ejs-layouts');
-//const mongodb = require('mongodb')
 const mongoose = require('mongoose');
-const flash = require('connect-flash');
 const session = require('express-session');
-
+const expressLayouts = require('express-ejs-layouts');
+const flash = require('connect-flash');
+const passport = require('passport');
 
 const app = express();
+
+// Passport config
+const configurePassport = require('./config/passport');
+configurePassport(passport);
 
 // DB config
 const uri = require('./config/keys').MongoURI;
 
 // Connect to db
-mongoose.connect(uri , { useNewUrlParser: true})
-    .then(() => console.log('MongoDB Connected...'))
-    .catch((err) => console.log(err));
-// const client = new mongodb.MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
-// client.connect(err => {
-//     console.log('MongoDB connected...');
-// })
+mongoose.connect(uri , { useNewUrlParser: true, useUnifiedTopology: true})
+    .then(() => console.log('MongoDB connected.'))
+    .catch((err) => console.log('ERROR: Could not connect to database. \nPlease enter valid database credentials in the /config/keys file.'));
 
 // eJS
 app.use(expressLayouts);
@@ -34,6 +33,10 @@ app.use(session({
     saveUninitialized: true,
 }));
 
+// Passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
+
 // Connect flash middleware
 app.use(flash()); 
 
@@ -41,6 +44,7 @@ app.use(flash());
 app.use((req, res, next) => {
     res.locals.success_msg = req.flash('success_msg');
     res.locals.error_msg = req.flash('error_msg');
+    res.locals.error = req.flash('error');
     next();
 })
 

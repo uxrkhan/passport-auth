@@ -3,32 +3,7 @@
         <div class="card card-body px-5">
             <h1 class="text-center my-3"><i class="fas fa-user-plus text-success"></i> Register</h1>
 
-            <% if (typeof errors != 'undefined') errors.forEach(function(err){ %>
-                <div class="alert alert-warning alert-dismissible fade show" role="alert">
-                    <%= err.msg %>
-                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                      <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-            <% }) %>
-
-            <% if(success_msg != '') { %>
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <%= success_msg %>
-                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                      <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-            <% } %>
-
-            <% if(error_msg != '') { %>
-                <div class="alert alert-warning alert-dismissible fade show" role="alert">
-                    <%= error_msg %>
-                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                      <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-            <% } %>
+            <%- include('./partials/messages.ejs') %>
 
             <form action="/users/register" method="POST">
                 <div class="form-group">
