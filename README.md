@@ -103,7 +103,7 @@ This is the main html file which contains all the body of the root container
 
 - The dashboard is the view that should appear after the user successfully logs in. This page can contain anything. A logout button is necessary.
 
-## Mongoose for Database
+## MongoDB for Database
 For databases, the obvious choice was MongoDB. 
 
 ```js
